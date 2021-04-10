@@ -1,57 +1,104 @@
 #pragma comment(lib,"cryptlib.lib")  
 #include <iostream>
 #include <iomanip>
-
+#include <cryptopp/rijndael.h>
+#include "cryptlib.h"
+#include "hex.h"
 #include "modes.h"
 #include "aes.h"
 #include "filters.h"
+#include "ccm.h"
+#include "assert.h"
 
 using namespace CryptoPP;
 using namespace std;
 
 int main() {
-
-    //Key and IV setup
-    //key = "1234567890ABCDEF"
-    //iv = "0000000000000000"
     
-    byte key[CryptoPP::AES::DEFAULT_KEYLENGTH] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46};
-    byte iv[CryptoPP::AES::BLOCKSIZE] = { 0x30,0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30};
-
-    //
-    // String and Sink setup
-    //
+    byte key[CryptoPP::AES::DEFAULT_KEYLENGTH] = { 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46 };
+    byte iv[CryptoPP::AES::BLOCKSIZE];
+    memset(iv, 0x30, CryptoPP::AES::BLOCKSIZE);
+        //= { 0x30,0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30 };
     string plaintext = "Hello World!";
-    string ciphertext;
+    string ciphertext, encoded;
+    
+    //1. CFB
+    
+    CFB_Mode<AES>::Encryption e1;
+    e1.SetKeyWithIV(key, sizeof(key), iv);
+    StringSource ss1(plaintext, true,
+        new StreamTransformationFilter(e1,
+            new StringSink(ciphertext),
+        BlockPaddingSchemeDef::BlockPaddingScheme::NO_PADDING
+        ) 
+        // StreamTransformationFilter      
+    );
+    StringSource ss2(ciphertext, true,
+        new HexEncoder(
+            new StringSink(encoded)
+        ) // HexEncoder
+    ); // StringSource
+    cout << "cipher text: " << encoded << endl;
 
-    //
-    // Dump Plain Text
-    //
-    cout << "Plain Text (" << plaintext.size() << " bytes)" << endl;
-    cout << plaintext;
-    cout << endl;
 
-    //
-    // Create Cipher Text
-    //
-    AES::Encryption aesEncryption(key, AES::DEFAULT_KEYLENGTH);
-    CBC_Mode_ExternalCipher::Encryption cbcEncryption(aesEncryption, iv);
 
-    StreamTransformationFilter stfEncryptor(cbcEncryption, new StringSink(ciphertext));
-    stfEncryptor.Put(reinterpret_cast<const unsigned char*>(plaintext.c_str()), plaintext.length());
-    stfEncryptor.MessageEnd();
+    
+    //2. CBC with iv = "0000000000000000" and zeros padding
+    
+    ciphertext.clear();
+    CBC_Mode< AES >::Encryption e2;
+    e2.SetKeyWithIV(key, sizeof(key), iv);
+    StringSource ss3(plaintext, true,
+        new StreamTransformationFilter(e2,
+            new StringSink(ciphertext),
+        BlockPaddingSchemeDef::BlockPaddingScheme::ZEROS_PADDING
+        ) // StreamTransformationFilter
+    );
+    encoded.clear();
+    StringSource ss4(ciphertext, true,
+        new HexEncoder(
+            new StringSink(encoded)
+        ) // HexEncoder
+    ); // StringSource
+    cout << "cipher text: " << encoded << endl;
 
-    //
-    // Dump Cipher Text
-    //
-    cout << "Cipher Text (" << ciphertext.size() << " bytes)" << endl;
+    //3. CBC with iv = "9999999999999999" and PKCS_PADDING
+    memset(iv, 0x39, CryptoPP::AES::BLOCKSIZE);
+    ciphertext.clear();
+    CBC_Mode< AES >::Encryption e3;
+    e3.SetKeyWithIV(key, sizeof(key), iv);
+    StringSource ss5(plaintext, true,
+        new StreamTransformationFilter(e3,
+            new StringSink(ciphertext),
+        BlockPaddingSchemeDef::BlockPaddingScheme::PKCS_PADDING
+        ) // StreamTransformationFilter
+    );
+    encoded.clear();
+    StringSource ss6(ciphertext, true,
+        new HexEncoder(
+            new StringSink(encoded)
+        ) // HexEncoder
+    ); // StringSource
+    cout << "cipher text: " << encoded << endl;
 
-    for (int i = 0; i < ciphertext.size(); i++) {
+    //4. ECB with PKCS_PADDING
 
-        cout <<  hex << (0xFF & static_cast<byte>(ciphertext[i])) << " ";
-    }
-
-    cout << endl;
+    ciphertext.clear();
+    encoded.clear();
+    ECB_Mode< AES >::Encryption e4;
+    e4.SetKey(key, sizeof(key));
+    StringSource ss7(plaintext, true,
+        new StreamTransformationFilter(e4,
+            new StringSink(ciphertext),
+        BlockPaddingSchemeDef::BlockPaddingScheme::PKCS_PADDING
+        ) // StreamTransformationFilter      
+    );
+    StringSource ss8(ciphertext, true,
+        new HexEncoder(
+            new StringSink(encoded)
+        ) // HexEncoder
+    ); // StringSource
+    cout << "cipher text: " << encoded << endl;
 
     return 0;
 }
