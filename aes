@@ -1,0 +1,58 @@
+#pragma comment(lib,"cryptlib.lib")  
+#include <iostream>
+#include <iomanip>
+
+#include "modes.h"
+#include "aes.h"
+#include "filters.h"
+
+using namespace CryptoPP;
+using namespace std;
+
+int main() {
+
+    //Key and IV setup
+    //key = "1234567890ABCDEF"
+    //iv = "0000000000000000"
+    
+    byte key[CryptoPP::AES::DEFAULT_KEYLENGTH] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46};
+    byte iv[CryptoPP::AES::BLOCKSIZE] = { 0x30,0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30};
+
+    //
+    // String and Sink setup
+    //
+    string plaintext = "Hello World!";
+    string ciphertext;
+
+    //
+    // Dump Plain Text
+    //
+    cout << "Plain Text (" << plaintext.size() << " bytes)" << endl;
+    cout << plaintext;
+    cout << endl;
+
+    //
+    // Create Cipher Text
+    //
+    AES::Encryption aesEncryption(key, AES::DEFAULT_KEYLENGTH);
+    CBC_Mode_ExternalCipher::Encryption cbcEncryption(aesEncryption, iv);
+
+    StreamTransformationFilter stfEncryptor(cbcEncryption, new StringSink(ciphertext));
+    stfEncryptor.Put(reinterpret_cast<const unsigned char*>(plaintext.c_str()), plaintext.length());
+    stfEncryptor.MessageEnd();
+
+    //
+    // Dump Cipher Text
+    //
+    cout << "Cipher Text (" << ciphertext.size() << " bytes)" << endl;
+
+    for (int i = 0; i < ciphertext.size(); i++) {
+
+        cout <<  hex << (0xFF & static_cast<byte>(ciphertext[i])) << " ";
+    }
+
+    cout << endl;
+
+    return 0;
+}
+
